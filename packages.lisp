@@ -35,6 +35,7 @@
 	   :defrule
 	   :parser-context
 	   :parser-context-error
+	   :create-parser-context
 	   :make-char-accum
 	   :char-accum-push
 	   :reset-char-accum

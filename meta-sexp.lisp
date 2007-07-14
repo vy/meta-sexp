@@ -58,6 +58,25 @@
       (setf (slot-value ctx 'size)
 	    (length (parser-context-data ctx)))))
 
+(defgeneric create-parser-context (input &rest args))
+
+(defmethod create-parser-context ((input string) &key start end)
+  (make-instance 'parser-context :data input :size end :cursor (or start 0)))
+
+(defmethod create-parser-context ((input string-stream) &key buffer-size start end)
+  (assert (input-stream-p input))
+  (let* (size
+	 (string
+	  (with-output-to-string (output)
+	    (loop with buffer-size = (or buffer-size 8192)
+		  with buf = (make-string buffer-size)
+		  for pos = (read-sequence buf input :end buffer-size)
+		  sum pos into size-acc
+		  until (zerop pos)
+		  do (write-string buf output :end pos)
+		  finally (setq size size-acc)))))
+    (create-parser-context string :start start :end (or end size))))
+
 (defgeneric peek-atom (ctx))
 (defgeneric read-atom (ctx))
 (defgeneric checkpoint (ctx))
