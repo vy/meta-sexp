@@ -60,6 +60,12 @@ T
 ==> META-SEXP in Wonderland!
 NIL
 
+Instead of creating PARSER-CONTEXT instances manually, you may want to
+prefer below CREATE-PARSER-CONTEXT methods too.
+
+  create-parser-context ((input string) &key start end)
+  create-parser-context ((input string-stream) &key buffer-size start end)
+
 
  ,-------------------------.
  | AVAILABLE TYPE CHECKERS |
