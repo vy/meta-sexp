@@ -1,0 +1,149 @@
+ ,----------.
+ | OVERVIEW |
+ `----------'
+
+meta-sexp is a META parser generator using LL(1) grammars with
+s-expressions. meta-sexp uses in-memory string vectors, instead of
+commonly used streams, for efficiently stepping backward and forward
+through the input. It is tested on SBCL but should be portable to
+other implementations as well.
+
+Inspired by src/parser.lisp of core-stream project at
+http://core.gen.tr/
+
+Idea is based on the META language discussed in `Pragmatic Parsing
+in Common Lisp' paper of Henry G. Baker
+[ACM Lisp Pointers 4, 2 (Apr/Jun 1991), 3-15]
+
+
+ ,--------------------.
+ | QUICK INTRODUCTION |
+ `--------------------'
+
+In most of the time, you'll need to define your own parsers using
+DEFRULE. But in some certain situations, you may need to DEFATOM
+too. (See builtin functions for further examples.)
+
+(defrule wiki-link? (&aux c (href (make-char-accum)) (text (make-char-accum)))
+  "[["
+  (:+ (:not (:or "]]" (:type white-space?)))
+      (:assign c (:type graphic?))
+      (:char-push c href))
+  (:? (:rule lwsp?)
+      (:+ (:not "]]")
+	  (:assign c (:type graphic?))
+	  (:char-push c text)))
+  "]]"
+  (:return href text))
+
+(wiki-link? (make-instance 'parser-context :data "[[http://foo.com/]]"))
+==> "http://foo.com/", ""
+
+(wiki-link? (make-instance 'parser-context :data "[[http://foo.com/ bar baz]]"))
+==> "http://foo.com/", "bar baz"
+
+(wiki-link? (make-instance 'parser-context :data "[[]]"))
+==> NIL
+
+(defrule in-wonderland? ()
+  "META-SEXP"
+  (progn
+    (format t "META-SEXP in Wonderland!")
+    (meta (:type space?)
+	  "in Wonderland!"))
+  (:return t))
+
+(in-wonderland? (make-instance 'parser-context :data "META-SEXP in Wonderland!"))
+==> META-SEXP in Wonderland!
+T
+(in-wonderland? (make-instance 'parser-context :data "META-SEXP in Fooland!"))
+==> META-SEXP in Wonderland!
+NIL
+
+
+ ,-------------------------.
+ | AVAILABLE TYPE CHECKERS |
+ `-------------------------'
+
+These functions (and types) are routines introduced using DEFATOM
+and operates on character codes. In case of need, you can add your
+own type checkers. (See source for examples.)
+
+ALNUM? ALPHA? GRAPHIC? ASCII? BIT? DIGIT? EXTENDED? LOWER? NEWLINE?
+SPACE? TAB? UPPER? WHITE-SPACE?
+
+
+ ,-----------------.
+ | AVAILABLE RULES |
+ `-----------------'
+
+Rules are parser grammars compiled by COMPILE-GRAMMAR.
+
+LWSP? (Linear White-Space)
+
+
+ ,---------------------------.
+ | AVAILABLE SYNTAX KEYWORDS |
+ `---------------------------'
+
+(:CHECKPOINT FORM)
+  If form returns NIL, cursor will be back-positioned to its old
+  location :CHECKPOINT keyword was used.
+
+(:AND FORM FORM ...)
+(:OR FORM FORM ...)
+
+(:NOT FORM)
+  Besides its normal behaviour, (:NOT ...) expressions
+  automatically get encapsulated in (:CHECKPOINT ...) clauses.
+
+(:RETURN VAR VAR ...)
+  Returns supplied variables using VALUES function.
+
+(:? FORM FORM ...)
+  May appear once. (Similar to `?' in regular expressions.)
+(:* FORM FORM ...)
+  May appear none or more. (Similar to `*' in regular expressions.)
+(:+ FORM FORM ...)
+  Must appear at least once. (Similar to `{1,}' in regular expressions.)
+
+(:TYPE TYPE-CHECKER)
+(:TYPE (OR TYPE-CHECKER TYPE-CHECKER ...))
+(:RULE RULE)
+(:RULE (OR RULE RULE ...))
+  Tests current input from the current cursor position using
+  specified type/form.
+
+(:ASSIGN VAR FORM)
+  Assigns returned value of FORM to VAR, and returns assigned
+  value.
+
+(:LIST-PUSH ITEM-VAR LIST-ACCUM)
+(:CHAR-PUSH CHAR-VAR CHAR-ACCUM)
+(:CHAR-PUSH CHAR-ACCUM)
+  Pushes supplied ITEM-VAR/CHAR-VAR into specified
+  LIST-ACCUM/CHAR-ACCUM. If :CHAR-PUSH is called with only one
+  argument, current character gets read and pushed into supplied
+  accumulator. (You can use MAKE-LIST-ACCUM and MAKE-CHAR-ACCUM
+  functions to initialize new accumulators.)
+
+(:LIST-RESET LIST-ACCUM)
+(:CHAR-RESET CHAR-ACCUM)
+  Resets supplied accumulators.
+
+(:DEBUG)
+(:DEBUG VAR)
+  Prints current character and its position in the input data. If VAR
+  is specified, prints the value of the VAR.
+
+If a form doesn't start with any of the above keywords, there're
+three possiblities remaining:
+
+  i. This can be a character.
+ ii. This can be a string. (Will get expanded into an AND'ed character
+     list with an outermost :CHECKPOINT.)
+iii. Treat as a custom form. (Will get evaluated as is.)
+
+When you're in the third situation, to be able to get your META
+s-expressions compiled again, use META keyword. (See the second
+example in the Quick Introduction.)
