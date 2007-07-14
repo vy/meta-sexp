@@ -129,7 +129,8 @@
   (make-array size :element-type 'character :adjustable t :fill-pointer 0))
 
 (defun char-accum-push (char accum)
-  (vector-push-extend char accum))
+  (if (typep char 'character)
+      (vector-push-extend char accum)))
 
 (defun reset-char-accum (accum)
   (setf (fill-pointer accum) 0))
