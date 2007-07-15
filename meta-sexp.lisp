@@ -210,7 +210,7 @@
 		       `(prog1 t
 			  ,(if (cadr form)
 			       `(format t "DEBUG: ~a: ~a~%" ',(cadr form) ,(cadr form))
-			       `(format t "DEBUG: cursor: [~a] `~a'~%"
+			       `(format t "DEBUG: cursor: [~s] `~s'~%"
 					(parser-context-cursor ,ctx)
 					(elt (parser-context-data ,ctx)
 					     (parser-context-cursor ,ctx))))))))
