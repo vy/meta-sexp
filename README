@@ -36,7 +36,18 @@ CREATE-PARSER-CONTEXT methods and DEFRULE, DEFRENDERER macros.
 In some certain situations, you may also need to use DEFATOM too. See
 atoms.lisp for DEFATOM examples.
 
-Here is a tiny example:
+Here is a couple of tiny examples:
+
+  (defrule integer? (&aux (sign 1) d (num 0)) ()
+    (:? (:and "-" (:assign sign -1)))
+    (:? "+")
+    (:+ (:assign d (:type digit?))
+        (:assign num (+ (* num 10)
+	                (- (char-code d) #.(char-code #\0)))))
+    (:return (* sign num)))
+
+  (integer? (create-parser-context "+123")) ==> 123
+  (integer? (create-parser-context "-12")) ==> -123
 
   (defrule integer?
       (&aux sign c (num 0))
