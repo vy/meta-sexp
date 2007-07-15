@@ -42,4 +42,4 @@
   :depends-on (:cl-utilities)
   :components ((:file "packages")
                (:file "meta-sexp")
-	       (:file "rules")))
+	       (:file "atoms")))

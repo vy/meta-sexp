@@ -33,15 +33,18 @@
   (:use :cl :cl-utilities)
   (:export :defatom
 	   :defrule
+	   :defrenderer
 	   :parser-context
 	   :parser-context-error
 	   :create-parser-context
 	   :make-char-accum
 	   :char-accum-push
 	   :reset-char-accum
+	   :empty-char-accum-p
 	   :make-list-accum
 	   :list-accum-push
 	   :reset-list-accum
+	   :empty-list-accum-p
 	   :compile-grammar
 	   :grammar-error
 	   :meta
@@ -58,6 +61,4 @@
 	   :space?
 	   :tab?
 	   :upper?
-	   :white-space?
-	   ;; Builtin Rules
-	   :lwsp?))
+	   :white-space?))

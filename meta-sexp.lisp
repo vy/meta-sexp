@@ -48,7 +48,12 @@
    (checkpoints
     :initform nil
     :accessor parser-context-checkpoints
-    :documentation "Reversed list of declared checkpoints."))
+    :documentation "Reversed list of declared checkpoints.")
+   (attachment
+    :initarg :attachment
+    :initform nil
+    :accessor parser-context-attachment
+    :documentation "Attachment to carry with to parser context object."))
   (:documentation "Information about current state of the parsing process."))
 
 (defgeneric parser-context-size (ctx))
@@ -60,10 +65,15 @@
 
 (defgeneric create-parser-context (input &rest args))
 
-(defmethod create-parser-context ((input string) &key start end)
-  (make-instance 'parser-context :data input :size end :cursor (or start 0)))
+(defmethod create-parser-context ((input string) &key start end attachment)
+  (make-instance 'parser-context
+		 :data input
+		 :size end
+		 :cursor (or start 0)
+		 :attachment attachment))
 
-(defmethod create-parser-context ((input string-stream) &key buffer-size start end)
+(defmethod create-parser-context
+    ((input string-stream) &key buffer-size start end attachment)
   (assert (input-stream-p input))
   (let* (size
 	 (string
@@ -75,7 +85,8 @@
 		  until (zerop pos)
 		  do (write-string buf output :end pos)
 		  finally (setq size size-acc)))))
-    (create-parser-context string :start start :end (or end size))))
+    (create-parser-context
+     string :start start :end (or end size) :attachment attachment)))
 
 (defgeneric peek-atom (ctx))
 (defgeneric read-atom (ctx))
@@ -135,6 +146,9 @@
 (defun reset-char-accum (accum)
   (setf (fill-pointer accum) 0))
 
+(defun empty-char-accum-p (accum)
+  (zerop (fill-pointer accum)))
+
 (defun make-list-accum ()
   nil)
 
@@ -143,6 +157,9 @@
 
 (defmacro reset-list-accum (accum)
   `(setf ,accum nil))
+
+(defun empty-list-accum-p (accum)
+  (endp accum))
 
 
 ;;; Grammar Compiler
@@ -168,6 +185,7 @@
 		      (:or `(or ,@(compile-exprs (cdr form))))
 		      (:not (compile-expr `(:checkpoint (not ,(compile-expr (cadr form))))))
 		      (:return `(return-from rule-block (values ,@(cdr form))))
+		      (:render `(,(cadr form) ,@(nconc (list ctx) (cddr form))))
 		      (:? `(prog1 t ,(compile-expr `(:and ,@(cdr form)))))
 		      (:* `(not (do () ((not ,(compile-expr `(:and ,@(cdr form))))))))
 		      (:+ (compile-expr `(:and ,@(cdr form) (:* ,@(cdr form)))))
@@ -186,6 +204,7 @@
 			   `(char-accum-push ,(cadr form) ,(caddr form))
 			   `(char-accum-push (read-atom ,ctx) ,(cadr form))))
 		      (:char-reset `(reset-char-accum ,(cadr form)))
+		      (:read-atom `(read-atom ,ctx))
 		      (:debug
 		       `(prog1 t
 			  ,(if (cadr form)
@@ -206,59 +225,28 @@
     (compile-expr form)))
 
 
-;;; Atom Definitions
+;;; Atom, Rule & Renderer Definition Macros
 
 (defmacro defatom (name &body body)
   `(progn
      (defun ,name (c) (when c ,@body))
      (deftype ,name () `(satisfies ,',name))))
 
-(defatom ascii?
-  (typep c 'standard-char))
+(defmacro destructure-attachment ((ctx lambda-list) &body body)
+  (if lambda-list
+      `(destructuring-bind ,lambda-list (parser-context-attachment ,ctx)
+	 ,@body)
+      `(progn ,@body)))
 
-(defatom extended?
-  (typep c 'extended-char))
-
-(defatom alpha?
-  (alpha-char-p c))
-
-(defatom alnum?
-  (alphanumericp c))
-
-(defatom graphic?
-  (graphic-char-p c))
-
-(defatom upper?
-  (upper-case-p c))
-
-(defatom lower?
-  (lower-case-p c))
-
-(defatom digit?
-  (digit-char-p c))
-
-(defatom bit?
-  (or (char= c #\0)
-      (char= c #\1)))
-
-(defatom space?
-  (char= c #\space))
-
-(defatom newline?
-  (char= c #\newline))
-
-(defatom tab?
-  (char= c #\tab))
-
-(defatom white-space?
-  (or (space? c)
-      (tab? c)))
-
-
-;;; Rule Definitions
-
-(defmacro defrule (name (&rest args) &body body)
+(defmacro defrule (name (&rest args) (&rest attachment-lambda-list) &body body)
   (with-gensyms (ctx)
     `(defun ,name ,(nconc (list ctx) args)
-       (block rule-block
-	 ,(compile-grammar ctx `(:checkpoint (:and ,@body)))))))
+       (destructure-attachment (,ctx ,attachment-lambda-list)
+	 (block rule-block
+	   ,(compile-grammar ctx `(:checkpoint (:and ,@body))))))))
+
+(defmacro defrenderer (name (&rest args) (&rest attachment-lambda-list) &body body)
+  (with-gensyms (ctx)
+    `(defun ,name ,(nconc (list ctx) args)
+       (destructure-attachment (,ctx ,attachment-lambda-list) ,@body)
+       t)))
