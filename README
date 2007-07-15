@@ -173,6 +173,9 @@ SPACE? TAB? UPPER? WHITE-SPACE?
 (:CHAR-RESET CHAR-ACCUM)
   Resets supplied accumulators.
 
+(:EOF)
+  Returns true when reached to the end of supplied input data.
+
 (:READ-ATOM)
   Reads current atom at the cursor position.
 

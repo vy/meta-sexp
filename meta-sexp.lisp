@@ -204,6 +204,7 @@
 			   `(char-accum-push ,(cadr form) ,(caddr form))
 			   `(char-accum-push (read-atom ,ctx) ,(cadr form))))
 		      (:char-reset `(reset-char-accum ,(cadr form)))
+		      (:eof `(= (parser-context-cursor ,ctx) (parser-context-size ,ctx)))
 		      (:read-atom `(read-atom ,ctx))
 		      (:debug
 		       `(prog1 t
