@@ -95,7 +95,7 @@ complete example with renderers and attachments.
   (wiki-markup?
    (create-parser-context
     "foo bar [[ref text]] and [[just-ref]] here."
-    :attachment (list (make-string-output-stream))))
+    :attachment (make-string-output-stream)))
   ==> "foo bar <a href='ref'>text</a> and <a href='just-ref'>just-ref</a> here."
 
 What's the role of ATTACHMENT slot given to CREATE-PARSER-CONTEXT (or
