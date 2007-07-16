@@ -26,17 +26,17 @@ CREATE-PARSER-CONTEXT methods and DEFRULE, DEFRENDERER macros.
   create-parser-context ((input string) &key start end attachment)
   create-parser-context ((input string-stream) &key buffer-size start end attachment)
 
-  defrule (name (&rest args) (&rest attachment-lambda-list) &body body)
-  defrenderer (name (&rest args) (&rest attachment-lambda-list) &body body)
+  defrule (name (&rest args) (&optional attachment) &body body)
+  defrenderer (name (&rest args) (&optional attachment) &body body)
 
-  If supplied, attachment lambda lists are expanded using
-  DESTRUCTURE-BIND on ATTACHMENT given to CREATE-PARSER-CONTEXT (or
-  specified via MAKE-INSTANCE).
+  If supplied, ATTACHMENT argument will get bound to ATTACHMENT
+  keyword given to CREATE-PARSER-CONTEXT (or specified via
+  MAKE-INSTANCE).
 
 In some certain situations, you may also need to use DEFATOM too. See
 atoms.lisp for DEFATOM examples.
 
-Here is a couple of tiny examples:
+Here is a tiny example:
 
   (defrule integer? (&aux (sign 1) d (num 0)) ()
     (:? (:and "-" (:assign sign -1)))
@@ -47,20 +47,7 @@ Here is a couple of tiny examples:
     (:return (* sign num)))
 
   (integer? (create-parser-context "+123")) ==> 123
-  (integer? (create-parser-context "-12")) ==> -123
-
-  (defrule integer?
-      (&aux sign c (num 0))
-      ()
-    (:? (:or (:and "+" (:assign sign 1))
-             (:and "-" (:assign sign -1))))
-    (:+ (:assign c (:type digit?))
-        (:assign num (+ (* num 10)
-	                (- (char-code c) #.(char-code #\0)))))
-    (:return (* sign num)))
-
-   (integer? (make-instance 'parser-context :data "-14"))
-   ==> -14
+  (integer? (create-parser-context "-123")) ==> -123
 
 Here is another example demonstrating the usage of META symbol.
 
@@ -85,15 +72,11 @@ Here is another example demonstrating the usage of META symbol.
 You mostly won't need to bother with MAKE-INSTANCE calls. Here's a
 complete example with renderers and attachments.
 
-  (defrenderer internal-link!
-      (label &optional text)
-      (attachment)
+  (defrenderer internal-link! (label &optional text) (attachment)
     (format attachment "<a href='~a'>~a</a>"
             label (if (empty-char-accum-p text) label text)))
   
-  (defrule internal-link?
-      (&aux (ref (make-char-accum)) (text (make-char-accum)))
-      ()
+  (defrule internal-link? (&aux (ref (make-char-accum)) (text (make-char-accum))) ()
     "[["
     (:+ (:not (:or "]]" (:type (or space? newline?))))
         (:char-push ref))
@@ -103,9 +86,7 @@ complete example with renderers and attachments.
     "]]"
     (:render internal-link! ref text))
   
-  (defrule wiki-markup?
-      (&aux c)
-      (attachment)
+  (defrule wiki-markup? (&aux c) (attachment)
     (:* (:or (:rule internal-link?)
              (:and (:assign c (:read-atom))
 	           (if c (write-char c attachment)))))
@@ -116,6 +97,16 @@ complete example with renderers and attachments.
     "foo bar [[ref text]] and [[just-ref]] here."
     :attachment (list (make-string-output-stream))))
   ==> "foo bar <a href='ref'>text</a> and <a href='just-ref'>just-ref</a> here."
+
+What's the role of ATTACHMENT slot given to CREATE-PARSER-CONTEXT (or
+specified as a keyword while making an instance of PARSER-CONTEXT
+class)? Think it as a state storage unit between passes to defined
+rules and renderers. (For instance, in our above example, ATTACHMENT
+used as a common output stream.) Yes, it is possible to let this
+problem get solved by the programmer via global variables. But this
+approach yields to another problem: thread safety. Anyway, that was
+the best that I can come up with; if you have any other ideas, I'd be
+happy to hear them.
 
 
  ,-------------------------.

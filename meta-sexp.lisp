@@ -233,21 +233,21 @@
      (defun ,name (c) (when c ,@body))
      (deftype ,name () `(satisfies ,',name))))
 
-(defmacro destructure-attachment ((ctx lambda-list) &body body)
-  (if lambda-list
-      `(destructuring-bind ,lambda-list (parser-context-attachment ,ctx)
-	 ,@body)
-      `(progn ,@body)))
-
-(defmacro defrule (name (&rest args) (&rest attachment-lambda-list) &body body)
+(defmacro defrule (name (&rest args) (&optional attachment) &body body)
   (with-gensyms (ctx)
-    `(defun ,name ,(nconc (list ctx) args)
-       (destructure-attachment (,ctx ,attachment-lambda-list)
-	 (block rule-block
-	   ,(compile-grammar ctx `(:checkpoint (:and ,@body))))))))
+    `(defun ,name (,ctx ,@args)
+       ,(if attachment
+	    `(let ((,attachment (parser-context-attachment ,ctx)))
+	       (block rule-block
+		 ,(compile-grammar ctx `(:checkpoint (:and ,@body)))))
+	    `(block rule-block
+	       ,(compile-grammar ctx `(:checkpoint (:and ,@body))))))))
 
-(defmacro defrenderer (name (&rest args) (&rest attachment-lambda-list) &body body)
+(defmacro defrenderer (name (&rest args) (&optional attachment) &body body)
   (with-gensyms (ctx)
-    `(defun ,name ,(nconc (list ctx) args)
-       (destructure-attachment (,ctx ,attachment-lambda-list) ,@body)
+    `(defun ,name (,ctx ,@args)
+       ,(if attachment
+	    `(let ((,attachment (parser-context-attachment ,ctx)))
+	       ,@body)
+	    `(progn ,@body))
        t)))
