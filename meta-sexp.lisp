@@ -38,30 +38,27 @@
     :documentation "Input data getting parsed.")
    (size
     :initarg :size
-    :initform nil
+    :accessor parser-context-size
     :documentation "Size of the input data.")
    (cursor
     :initarg :cursor
-    :initform 0
     :accessor parser-context-cursor
     :documentation "Current location on the input data.")
    (checkpoints
-    :initform nil
     :accessor parser-context-checkpoints
     :documentation "Reversed list of declared checkpoints.")
    (attachment
     :initarg :attachment
-    :initform nil
     :accessor parser-context-attachment
     :documentation "Attachment to carry with to parser context object."))
   (:documentation "Information about current state of the parsing process."))
 
-(defgeneric parser-context-size (ctx))
-
-(defmethod parser-context-size ((ctx parser-context))
-  (or (slot-value ctx 'size)
-      (setf (slot-value ctx 'size)
-	    (length (parser-context-data ctx)))))
+(defmethod shared-initialize ((ctx parser-context) slot-names &rest args)
+  (setf (parser-context-data ctx) (getf args :data)
+	(parser-context-size ctx) (or (getf args :size) (length (getf args :data)))
+	(parser-context-attachment ctx) (getf args :attachment)
+	(parser-context-cursor ctx) (getf args :cursor)
+	(parser-context-checkpoints ctx) nil))
 
 (defgeneric create-parser-context (input &rest args))
 
@@ -88,40 +85,39 @@
     (create-parser-context
      string :start start :end (or end size) :attachment attachment)))
 
-(defgeneric peek-atom (ctx))
-(defgeneric read-atom (ctx))
-(defgeneric checkpoint (ctx))
-(defgeneric rollback (ctx))
-(defgeneric commit (ctx))
-
 (define-condition parser-context-error ()
   ((operation :initarg :operation :accessor parser-context-error-operation)))
 
-(defmethod peek-atom ((ctx parser-context))
+(declaim (inline peek-atom))
+(defun peek-atom (ctx)
   (if (< (parser-context-cursor ctx) (parser-context-size ctx))
       (elt (parser-context-data ctx) (parser-context-cursor ctx))))
 
-(defmethod read-atom ((ctx parser-context))
-  (when (< (parser-context-cursor ctx) (parser-context-size ctx))
-    (incf (parser-context-cursor ctx))
-    (elt (parser-context-data ctx) (1- (parser-context-cursor ctx)))))
+(declaim (inline read-atom))
+(defun read-atom (ctx)
+  (when (< (parser-context-cursor ctx) (parser-context-size ctx))    
+    (elt (parser-context-data ctx) (1- (incf (parser-context-cursor ctx))))))
 
-(defmethod checkpoint ((ctx parser-context))
+(declaim (inline checkpoint))
+(defun checkpoint (ctx)
   (push (parser-context-cursor ctx) (parser-context-checkpoints ctx)))
 
-(defmethod rollback ((ctx parser-context))
+(declaim (inline rollback))
+(defun rollback (ctx)
   (let ((prev-pos (pop (parser-context-checkpoints ctx))))
     (if prev-pos
 	(setf (parser-context-cursor ctx) prev-pos)
 	(error 'parser-context-error :operation 'rollback))))
 
-(defmethod commit ((ctx parser-context))
+(declaim (inline commit))
+(defun commit (ctx)
   (if (not (pop (parser-context-checkpoints ctx)))
       (error 'parser-context-error :operation 'commit)))
 
 
 ;;; Atom, Rule & Type Matching
 
+(declaim (inline match-atom))
 (defun match-atom (ctx atom &aux (c (peek-atom ctx)))
   (if (and c (char= atom c))
       (read-atom ctx)))
@@ -136,19 +132,24 @@
 
 ;;; Accumulators
 
+(declaim (inline make-char-accum))
 (defun make-char-accum (&key (size 512))
   (make-array size :element-type 'character :adjustable t :fill-pointer 0))
 
+(declaim (inline char-accum-push))
 (defun char-accum-push (char accum)
   (if (typep char 'character)
       (vector-push-extend char accum)))
 
+(declaim (inline reset-char-accum))
 (defun reset-char-accum (accum)
   (setf (fill-pointer accum) 0))
 
+(declaim (inline empty-char-accum-p))
 (defun empty-char-accum-p (accum)
   (zerop (fill-pointer accum)))
 
+(declaim (inline make-list-accum))
 (defun make-list-accum ()
   nil)
 
@@ -158,6 +159,7 @@
 (defmacro reset-list-accum (accum)
   `(setf ,accum nil))
 
+(declaim (inline empty-list-accum-p))
 (defun empty-list-accum-p (accum)
   (endp accum))
 
@@ -230,6 +232,7 @@
 
 (defmacro defatom (name &body body)
   `(progn
+     (declaim (inline ,name))
      (defun ,name (c) (when c ,@body))
      (deftype ,name () `(satisfies ,',name))))
 

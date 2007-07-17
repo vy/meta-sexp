@@ -78,7 +78,7 @@ complete example with renderers and attachments.
   
   (defrule internal-link? (&aux (ref (make-char-accum)) (text (make-char-accum))) ()
     "[["
-    (:+ (:not (:or "]]" (:type (or space? newline?))))
+    (:+ (:not (:or "]]" (:type (or white-space? newline?))))
         (:char-push ref))
     (:? (:* (:type (or white-space? newline?)))
         (:+ (:not "]]")
@@ -89,7 +89,7 @@ complete example with renderers and attachments.
   (defrule wiki-markup? (&aux c) (attachment)
     (:* (:or (:rule internal-link?)
              (:and (:assign c (:read-atom))
-	           (if c (write-char c attachment)))))
+	           (write-char c attachment))))
     (get-output-stream-string attachment))
 
   (wiki-markup?
