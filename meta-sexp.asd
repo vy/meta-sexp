@@ -39,7 +39,7 @@
 (asdf:defsystem :meta-sexp
   :serial t
   :version +meta-sexp-version+
-  :depends-on (:cl-utilities)
   :components ((:file "packages")
+               (:file "util")
                (:file "meta-sexp")
 	       (:file "atoms")))

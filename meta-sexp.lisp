@@ -29,45 +29,24 @@
 (in-package :meta-sexp)
 
 
-;;; Parser Context Class & Routines
+;;; Parser Context Structure & Routines
 
-(defclass parser-context ()
-  ((data
-    :initarg :data
-    :accessor parser-context-data
-    :documentation "Input data getting parsed.")
-   (size
-    :initarg :size
-    :accessor parser-context-size
-    :documentation "Size of the input data.")
-   (cursor
-    :initarg :cursor
-    :accessor parser-context-cursor
-    :documentation "Current location on the input data.")
-   (checkpoints
-    :accessor parser-context-checkpoints
-    :documentation "Reversed list of declared checkpoints.")
-   (attachment
-    :initarg :attachment
-    :accessor parser-context-attachment
-    :documentation "Attachment to carry with to parser context object."))
-  (:documentation "Information about current state of the parsing process."))
-
-(defmethod shared-initialize ((ctx parser-context) slot-names &rest args)
-  (setf (parser-context-data ctx) (getf args :data)
-	(parser-context-size ctx) (or (getf args :size) (length (getf args :data)))
-	(parser-context-attachment ctx) (getf args :attachment)
-	(parser-context-cursor ctx) (getf args :cursor)
-	(parser-context-checkpoints ctx) nil))
+(defstruct parser-context
+  (data nil :read-only t :type string)
+  (size nil :read-only t :type unsigned-byte)
+  (cursor 0 :type unsigned-byte)
+  (checkpoints
+   (make-array 8 :element-type 'unsigned-byte :adjustable t :fill-pointer 0)
+   :type (vector unsigned-byte *))
+  attachment)
 
 (defgeneric create-parser-context (input &rest args))
 
 (defmethod create-parser-context ((input string) &key start end attachment)
-  (make-instance 'parser-context
-		 :data input
-		 :size end
-		 :cursor (or start 0)
-		 :attachment attachment))
+  (make-parser-context :data input
+		       :cursor (or start 0)
+		       :size (or end (length input))
+		       :attachment attachment))
 
 (defmethod create-parser-context
     ((input string-stream) &key buffer-size start end attachment)
@@ -85,9 +64,6 @@
     (create-parser-context
      string :start start :end (or end size) :attachment attachment)))
 
-(define-condition parser-context-error ()
-  ((operation :initarg :operation :accessor parser-context-error-operation)))
-
 (declaim (inline peek-atom))
 (defun peek-atom (ctx)
   (if (< (parser-context-cursor ctx) (parser-context-size ctx))
@@ -95,24 +71,20 @@
 
 (declaim (inline read-atom))
 (defun read-atom (ctx)
-  (when (< (parser-context-cursor ctx) (parser-context-size ctx))    
+  (when (< (parser-context-cursor ctx) (parser-context-size ctx))
     (elt (parser-context-data ctx) (1- (incf (parser-context-cursor ctx))))))
 
 (declaim (inline checkpoint))
 (defun checkpoint (ctx)
-  (push (parser-context-cursor ctx) (parser-context-checkpoints ctx)))
+  (vector-push-extend (parser-context-cursor ctx) (parser-context-checkpoints ctx)))
 
 (declaim (inline rollback))
 (defun rollback (ctx)
-  (let ((prev-pos (pop (parser-context-checkpoints ctx))))
-    (if prev-pos
-	(setf (parser-context-cursor ctx) prev-pos)
-	(error 'parser-context-error :operation 'rollback))))
+  (setf (parser-context-cursor ctx) (vector-pop (parser-context-checkpoints ctx))))
 
 (declaim (inline commit))
 (defun commit (ctx)
-  (if (not (pop (parser-context-checkpoints ctx)))
-      (error 'parser-context-error :operation 'commit)))
+  (vector-pop (parser-context-checkpoints ctx)))
 
 
 ;;; Atom, Rule & Type Matching
@@ -130,40 +102,6 @@
   `(,rule ,@(nconc (list ctx) args)))
 
 
-;;; Accumulators
-
-(declaim (inline make-char-accum))
-(defun make-char-accum (&key (size 512))
-  (make-array size :element-type 'character :adjustable t :fill-pointer 0))
-
-(declaim (inline char-accum-push))
-(defun char-accum-push (char accum)
-  (if (typep char 'character)
-      (vector-push-extend char accum)))
-
-(declaim (inline reset-char-accum))
-(defun reset-char-accum (accum)
-  (setf (fill-pointer accum) 0))
-
-(declaim (inline empty-char-accum-p))
-(defun empty-char-accum-p (accum)
-  (zerop (fill-pointer accum)))
-
-(declaim (inline make-list-accum))
-(defun make-list-accum ()
-  nil)
-
-(defmacro list-accum-push (item accum)
-  `(push ,item ,accum))
-
-(defmacro reset-list-accum (accum)
-  `(setf ,accum nil))
-
-(declaim (inline empty-list-accum-p))
-(defun empty-list-accum-p (accum)
-  (endp accum))
-
-
 ;;; Grammar Compiler
 
 (defun compile-grammar (ctx form)
@@ -175,7 +113,7 @@
 		   ((and (consp form) (keywordp (car form)))
 		    (ecase (car form)
 		      (:checkpoint
-		       (with-gensyms (ret)
+		       (with-unique-names (ret)
 			 `(progn
 			    (checkpoint ,ctx)
 			    (let ((,ret ,(compile-expr (cadr form))))
@@ -237,7 +175,7 @@
      (deftype ,name () `(satisfies ,',name))))
 
 (defmacro defrule (name (&rest args) (&optional attachment) &body body)
-  (with-gensyms (ctx)
+  (with-unique-names (ctx)
     `(defun ,name (,ctx ,@args)
        ,(if attachment
 	    `(let ((,attachment (parser-context-attachment ,ctx)))
@@ -247,7 +185,7 @@
 	       ,(compile-grammar ctx `(:checkpoint (:and ,@body))))))))
 
 (defmacro defrenderer (name (&rest args) (&optional attachment) &body body)
-  (with-gensyms (ctx)
+  (with-unique-names (ctx)
     `(defun ,name (,ctx ,@args)
        ,(if attachment
 	    `(let ((,attachment (parser-context-attachment ,ctx)))

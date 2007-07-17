@@ -29,9 +29,8 @@ CREATE-PARSER-CONTEXT methods and DEFRULE, DEFRENDERER macros.
   defrule (name (&rest args) (&optional attachment) &body body)
   defrenderer (name (&rest args) (&optional attachment) &body body)
 
-  If supplied, ATTACHMENT argument will get bound to ATTACHMENT
-  keyword given to CREATE-PARSER-CONTEXT (or specified via
-  MAKE-INSTANCE).
+In a rule or renderer body, if supplied, ATTACHMENT argument will get
+bound to ATTACHMENT keyword given to CREATE-PARSER-CONTEXT.
 
 In some certain situations, you may also need to use DEFATOM too. See
 atoms.lisp for DEFATOM examples.
@@ -59,18 +58,17 @@ Here is another example demonstrating the usage of META symbol.
 	    "in Wonderland!"))
     (:return t))
 
-  (in-wonderland? (make-instance
-                   'parser-context :data "META-SEXP in Wonderland!"))
+  (in-wonderland?
+   (create-parser-context :data "META-SEXP in Wonderland!"))
   META-SEXP in Wonderland!
   ==> T
 
-  (in-wonderland? (make-instance
-                   'parser-context :data "META-SEXP in Fooland!"))
+  (in-wonderland?
+   (create-parser-context :data "META-SEXP in Fooland!"))
   META-SEXP in Wonderland!
   ==> NIL
 
-You mostly won't need to bother with MAKE-INSTANCE calls. Here's a
-complete example with renderers and attachments.
+Here's a complete example with renderers and attachments.
 
   (defrenderer internal-link! (label &optional text) (attachment)
     (format attachment "<a href='~a'>~a</a>"

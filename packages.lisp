@@ -30,7 +30,7 @@
 
 (defpackage :meta-sexp
   (:documentation "LL(1) parser generator in META using s-expressions.")
-  (:use :cl :cl-utilities)
+  (:use :cl)
   (:export :defatom
 	   :defrule
 	   :defrenderer
