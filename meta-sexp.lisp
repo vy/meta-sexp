@@ -159,7 +159,6 @@
 		   (t (compile-expr form nil)))
 		 (cond
 		   ((and (consp form) (eql 'meta (car form)))
-		    (format t "will get compiled: ~a~%" `(:and ,@(cdr form)))
 		    (compile-expr `(:and ,@(cdr form))))
 		   ((consp form) (compile-exprs form nil))
 		   (t form)))))
