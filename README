@@ -38,8 +38,8 @@ atoms.lisp for DEFATOM examples.
 Here is a tiny example:
 
   (defrule integer? (&aux (sign 1) d (num 0)) ()
-    (:? (:and "-" (:assign sign -1)))
-    (:? "+")
+    (:? (:or (:and "-" (:assign sign -1))
+             "+"))
     (:+ (:assign d (:type digit?))
         (:assign num (+ (* num 10)
 	                (- (char-code d) #.(char-code #\0)))))
@@ -145,11 +145,11 @@ SPACE? TAB? UPPER? WHITE-SPACE?
 (:? FORM FORM ...)
   May appear once. (Similar to `?' in regular expressions.)
 
-(:MANY FORM FORM ...)
+(:SOME FORM FORM ...)
 (:* FORM FORM ...)
   May appear none or more. (Similar to `*' in regular expressions.)
 
-(:SOME FORM FORM ...)
+(:MANY FORM FORM ...)
 (:+ FORM FORM ...)
   Must appear at least once. (Similar to `{1,}' in regular expressions.)
 

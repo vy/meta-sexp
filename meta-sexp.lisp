@@ -135,8 +135,8 @@
 		      (:return `(signal 'parser-return :value (list ,@(cdr form))))
 		      (:render `(,(cadr form) ,@(nconc (list ctx) (cddr form))))
 		      ((:? :optional) `(prog1 t ,(compile-expr `(:and ,@(cdr form)))))
-		      ((:* :many) `(not (do () ((not ,(compile-expr `(:and ,@(cdr form))))))))
-		      ((:+ :some) (compile-expr `(:and ,@(cdr form) (:* ,@(cdr form)))))
+		      ((:* :some) `(not (do () ((not ,(compile-expr `(:and ,@(cdr form))))))))
+		      ((:+ :many) (compile-expr `(:and ,@(cdr form) (:* ,@(cdr form)))))
 		      (:type `(match-type ,ctx ,(cadr form)))
 		      (:rule
 		       (if (and (consp (cadr form))
