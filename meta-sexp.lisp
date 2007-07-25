@@ -132,7 +132,7 @@
 		      (:and `(and ,@(compile-exprs (cdr form))))
 		      (:or `(or ,@(compile-exprs (cdr form))))
 		      (:not (compile-expr `(:checkpoint (not ,(compile-expr (cadr form))))))
-		      (:return `(signal 'parser-return :value (values ,@(cdr form))))
+		      (:return `(signal 'parser-return :value (list ,@(cdr form))))
 		      (:render `(,(cadr form) ,@(nconc (list ctx) (cddr form))))
 		      ((:? :optional) `(prog1 t ,(compile-expr `(:and ,@(cdr form)))))
 		      ((:* :many) `(not (do () ((not ,(compile-expr `(:and ,@(cdr form))))))))
@@ -144,7 +144,10 @@
 			   (compile-expr
 			    `(:or ,@(mapcar #'(lambda (form) `(:rule ,form)) (cdadr form))))
 			   `(match-rule ,ctx ,(cadr form) ,(cddr form))))
-		      (:assign `(setq ,(cadr form) ,(compile-expr (caddr form))))
+		      (:assign
+		       (if (consp (cadr form))
+			   `(multiple-value-setq ,(cadr form) ,(compile-expr (caddr form)))
+			   `(setq ,(cadr form) ,(compile-expr (caddr form)))))
 		      (:list-push `(list-accum-push ,(cadr form) ,(caddr form)))
 		      (:list-reset `(reset-list-accum ,(cadr form)))
 		      (:char-push
@@ -190,7 +193,7 @@
 		   ,(compile-grammar ctx `(:checkpoint (:and ,@body))))
 		(compile-grammar ctx `(:checkpoint (:and ,@body))))
 	 (parser-return (data)
-	   (return-from ,name (parser-return-value data)))))))
+	   (return-from ,name (apply #'values (parser-return-value data))))))))
 
 (defmacro defrenderer (name (&rest args) (&optional attachment) &body body)
   (with-unique-names (ctx)

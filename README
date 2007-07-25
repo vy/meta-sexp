@@ -141,10 +141,15 @@ SPACE? TAB? UPPER? WHITE-SPACE?
   Calls specified RENDERER (that is defined with DEFRENDERER) with
   supplied arguments.
 
+(:OPTIONAL FORM FORM ...)
 (:? FORM FORM ...)
   May appear once. (Similar to `?' in regular expressions.)
+
+(:MANY FORM FORM ...)
 (:* FORM FORM ...)
   May appear none or more. (Similar to `*' in regular expressions.)
+
+(:SOME FORM FORM ...)
 (:+ FORM FORM ...)
   Must appear at least once. (Similar to `{1,}' in regular expressions.)
 
@@ -156,8 +161,9 @@ SPACE? TAB? UPPER? WHITE-SPACE?
   specified type/form.
 
 (:ASSIGN VAR FORM)
+(:ASSIGN (VAR1 VAR2 ...) FORM)
   Assigns returned value of FORM to VAR, and returns assigned
-  value.
+  value. (Latter form works similar to MULTIPLE-VALUE-SETQ.)
 
 (:LIST-PUSH ITEM-VAR LIST-ACCUM)
 (:CHAR-PUSH CHAR-VAR CHAR-ACCUM)
