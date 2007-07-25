@@ -35,9 +35,7 @@
   (data nil :read-only t :type string)
   (size nil :read-only t :type unsigned-byte)
   (cursor 0 :type unsigned-byte)
-  (checkpoints
-   (make-array 8 :element-type 'unsigned-byte :adjustable t :fill-pointer 0)
-   :type (vector unsigned-byte *))
+  (checkpoints nil)
   attachment)
 
 (defgeneric create-parser-context (input &rest args))
@@ -76,15 +74,15 @@
 
 (declaim (inline checkpoint))
 (defun checkpoint (ctx)
-  (vector-push-extend (parser-context-cursor ctx) (parser-context-checkpoints ctx)))
+  (push (parser-context-cursor ctx) (parser-context-checkpoints ctx)))
 
 (declaim (inline rollback))
 (defun rollback (ctx)
-  (setf (parser-context-cursor ctx) (vector-pop (parser-context-checkpoints ctx))))
+  (setf (parser-context-cursor ctx) (pop (parser-context-checkpoints ctx))))
 
 (declaim (inline commit))
 (defun commit (ctx)
-  (vector-pop (parser-context-checkpoints ctx)))
+  (pop (parser-context-checkpoints ctx)))
 
 
 ;;; Atom, Rule & Type Matching
@@ -104,6 +102,9 @@
 
 ;;; Grammar Compiler
 
+(define-condition parser-return ()
+  ((value :initarg :value :accessor parser-return-value)))
+
 (defun compile-grammar (ctx form)
   (labels ((compile-exprs (form &optional (in-meta t))
 	     (mapcar #'(lambda (form) (compile-expr form in-meta)) form))
@@ -116,7 +117,14 @@
 		       (with-unique-names (ret)
 			 `(progn
 			    (checkpoint ,ctx)
-			    (let ((,ret ,(compile-expr (cadr form))))
+			    (let ((,ret
+				   (handler-case ,(compile-expr (cadr form))
+				     (parser-return (data)
+				       (let ((value (parser-return-value data)))
+					 (if value
+					     (commit ,ctx)
+					     (rollback ,ctx))
+				       (signal 'parser-return :value value))))))
 			      (if ,ret
 				  (commit ,ctx)
 				  (rollback ,ctx))
@@ -124,11 +132,11 @@
 		      (:and `(and ,@(compile-exprs (cdr form))))
 		      (:or `(or ,@(compile-exprs (cdr form))))
 		      (:not (compile-expr `(:checkpoint (not ,(compile-expr (cadr form))))))
-		      (:return `(return-from rule-block (values ,@(cdr form))))
+		      (:return `(signal 'parser-return :value (values ,@(cdr form))))
 		      (:render `(,(cadr form) ,@(nconc (list ctx) (cddr form))))
-		      (:? `(prog1 t ,(compile-expr `(:and ,@(cdr form)))))
-		      (:* `(not (do () ((not ,(compile-expr `(:and ,@(cdr form))))))))
-		      (:+ (compile-expr `(:and ,@(cdr form) (:* ,@(cdr form)))))
+		      ((:? :optional) `(prog1 t ,(compile-expr `(:and ,@(cdr form)))))
+		      ((:* :many) `(not (do () ((not ,(compile-expr `(:and ,@(cdr form))))))))
+		      ((:+ :some) (compile-expr `(:and ,@(cdr form) (:* ,@(cdr form)))))
 		      (:type `(match-type ,ctx ,(cadr form)))
 		      (:rule
 		       (if (and (consp (cadr form))
@@ -176,12 +184,13 @@
 (defmacro defrule (name (&rest args) (&optional attachment) &body body)
   (with-unique-names (ctx)
     `(defun ,name (,ctx ,@args)
-       ,(if attachment
-	    `(let ((,attachment (parser-context-attachment ,ctx)))
-	       (block rule-block
-		 ,(compile-grammar ctx `(:checkpoint (:and ,@body)))))
-	    `(block rule-block
-	       ,(compile-grammar ctx `(:checkpoint (:and ,@body))))))))
+       (handler-case
+	   ,(if attachment
+		`(let ((,attachment (parser-context-attachment ,ctx)))
+		   ,(compile-grammar ctx `(:checkpoint (:and ,@body))))
+		(compile-grammar ctx `(:checkpoint (:and ,@body))))
+	 (parser-return (data)
+	   (return-from ,name (parser-return-value data)))))))
 
 (defmacro defrenderer (name (&rest args) (&optional attachment) &body body)
   (with-unique-names (ctx)
