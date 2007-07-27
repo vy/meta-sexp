@@ -166,7 +166,14 @@
 					(elt (parser-context-data ,ctx)
 					     (parser-context-cursor ,ctx))))))))
 		   ((characterp form) `(match-atom ,ctx ,form))
-		   ((stringp form) (compile-expr `(:checkpoint (:and ,@(coerce form 'list)))))
+		   ((stringp form)
+                    (compile-expr
+                     `(:checkpoint
+                       (and
+                        ,@(mapcar
+                           #'(lambda (form) `(match-atom ,ctx ,form))
+                           (coerce form 'list))
+                        ,form))))
 		   (t (compile-expr form nil)))
 		 (cond
 		   ((and (consp form) (eql 'meta (car form)))
