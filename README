@@ -123,6 +123,9 @@ SPACE? TAB? UPPER? WHITE-SPACE?
  | AVAILABLE SYNTAX KEYWORDS |
  `---------------------------'
 
+(:ICASE FORM FORM ...)
+  Process supplied FORMs case-insensitive.
+
 (:CHECKPOINT FORM)
   If form returns NIL, cursor will be back-positioned to its old
   location :CHECKPOINT keyword was used.
