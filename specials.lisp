@@ -26,39 +26,10 @@
 ;;; THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 ;;; SUCH DAMAGE.
 
-(in-package :cl-user)
+(in-package :meta-sexp)
 
-(defpackage :meta-sexp
-  (:documentation "LL(1) parser generator in META using s-expressions.")
-  (:use :cl)
-  (:export :defatom
-           :defrule
-           :defrenderer
-           :parser-context
-           :parser-context-error
-           :create-parser-context
-           :make-char-accum
-           :char-accum-push
-           :reset-char-accum
-           :empty-char-accum-p
-           :make-list-accum
-           :list-accum-push
-           :reset-list-accum
-           :empty-list-accum-p
-           :compile-grammar
-           :grammar-error
-           :meta
-           ;; Builtin Type-Checkers
-           :alnum?
-           :alpha?
-           :ascii?
-           :bit?
-           :digit?
-           :extended?
-           :graphic?
-           :lower?
-           :newline?
-           :space?
-           :tab?
-           :upper?
-           :white-space?))
+(defvar *transformation-rules* (make-hash-table :test 'eq)
+  "Transformation rules to compile meta-sexp grammar.")
+
+(defvar *atom-normalizer* #'char-upcase
+  "Normalizer function to make case-insensitive atom comparison.")

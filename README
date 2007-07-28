@@ -8,10 +8,10 @@ commonly used streams, for efficiently stepping backward and forward
 through the input. It is tested on SBCL but should be portable to
 other implementations as well.
 
-meta-sexp is implemented using a modular transformation
-processers. Therefore, besides builtin grammar transformators coming
-with meta-sexp, you can easily add your own transformation rules to
-meta-sexp too. (See REGISTER-TRANSFORMATION macro in meta-sexp.lisp.)
+meta-sexp is implemented using modular transformation processors.
+Therefore, besides builtin grammar transformators coming with
+meta-sexp, you can easily add your own transformation keywords to
+meta-sexp too. (See DEFINE-TRANSFORMATION macro in meta-sexp.lisp.)
 
 Inspired by src/parser.lisp of core-stream project at
 http://core.gen.tr/
@@ -155,7 +155,6 @@ SPACE? TAB? UPPER? WHITE-SPACE?
   (Similar to `?' in regular expressions.)
 
 (:* FORM FORM ...)
-
   Sequentially evaluates supplied FORMs within an AND scope until it
   returns NIL. Regardless of the return value of ANDed FORMs, block
   returns T. (Similar to `*' in regular expressions.)
@@ -171,8 +170,8 @@ SPACE? TAB? UPPER? WHITE-SPACE?
   Checks type of the atom at the current position through supplied
   function(s).
 
-(:RULE RULE)
-(:RULE (OR RULE RULE ...))
+(:RULE RULE ARG ARG ...)
+(:RULE (OR RULE RULE ...) ARG ARG ...)
   Tests input in the current cursor position using specified
   type/form. If any, supplied arguments will get passed to rule.
 
