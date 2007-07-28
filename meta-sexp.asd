@@ -33,7 +33,7 @@
 
 (in-package :meta-sexp-asd)
 
-(defconstant +meta-sexp-version+ "0.1.1")
+(defconstant +meta-sexp-version+ "0.1.2")
 (export '+meta-sexp-version+)
 
 (asdf:defsystem :meta-sexp

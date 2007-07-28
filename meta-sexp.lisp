@@ -36,6 +36,7 @@
   (size nil :read-only t :type unsigned-byte)
   (cursor 0 :type unsigned-byte)
   (checkpoints nil)
+  (icases nil)
   attachment)
 
 (defgeneric create-parser-context (input &rest args))
@@ -48,19 +49,19 @@
 
 (defmethod create-parser-context
     ((input string-stream) &key buffer-size start end attachment)
-  (assert (input-stream-p input))
-  (let* (size
-	 (string
-	  (with-output-to-string (output)
-	    (loop with buffer-size = (or buffer-size 8192)
-		  with buf = (make-string buffer-size)
-		  for pos = (read-sequence buf input :end buffer-size)
-		  sum pos into size-acc
-		  until (zerop pos)
-		  do (write-string buf output :end pos)
-		  finally (setq size size-acc)))))
-    (create-parser-context
-     string :start start :end (or end size) :attachment attachment)))
+  (loop with out = (make-string-output-stream)
+        with buffer-size = (or buffer-size 8192)
+        with buf = (make-string buffer-size)
+        for pos = (read-sequence buf input :end buffer-size)
+        sum pos into size
+        until (zerop pos)
+        do (write-string buf out :end pos)
+        finally (return
+                  (create-parser-context
+                   (get-output-stream-string out)
+                   :start start
+                   :end (or end size)
+                   :attachment attachment))))
 
 (declaim (inline peek-atom))
 (defun peek-atom (ctx)
@@ -89,7 +90,10 @@
 
 (declaim (inline match-atom))
 (defun match-atom (ctx atom &aux (c (peek-atom ctx)))
-  (if (and c (char= atom c))
+  (if (and c
+           (if (first (parser-context-icases ctx))
+               (char= (char-upcase atom) (char-upcase c))
+               (char= atom c)))
       (read-atom ctx)))
 
 (defmacro match-type (ctx type)
@@ -113,6 +117,18 @@
 		 (cond
 		   ((and (consp form) (keywordp (car form)))
 		    (ecase (car form)
+                      (:icase
+                       (with-unique-names (ret)
+                         `(progn
+                            (push t (parser-context-icases ,ctx))
+                            (let ((,ret
+                                   (handler-case ,(compile-expr `(:and ,@(cdr form)))
+                                     (parser-return (data)
+                                       (pop (parser-context-icases ,ctx))
+                                       (signal 'parser-return
+                                               :value (parser-return-value data))))))
+                              (pop (parser-context-icases ,ctx))
+                              ,ret))))
 		      (:checkpoint
 		       (with-unique-names (ret)
 			 `(progn
