@@ -107,8 +107,8 @@
 ;;; Grammar Compiler
 
 (defmacro define-transformation (key (ctx forms) &body body)
-  "Shortcut to register new transformer to *TRANSFORMATION-RULES* table."
-  `(setf (gethash ,key *transformation-rules*)
+  "Shortcut to register new transformer to *TRANSFORMATIONS* table."
+  `(setf (gethash ,key *transformations*)
         #'(lambda (,ctx ,forms)
             (declare (ignorable ,ctx ,forms))
             ,@body)))
@@ -121,7 +121,7 @@
       ;; In META scope.
       (cond
         ((and (consp form) (keywordp (car form)))
-         (let ((transformer (gethash (car form) *transformation-rules*)))
+         (let ((transformer (gethash (car form) *transformations*)))
            (if (null transformer)
                (transform-grammar ctx form nil)
                (funcall transformer ctx (cdr form)))))

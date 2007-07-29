@@ -28,7 +28,7 @@
 
 (in-package :meta-sexp)
 
-(defvar *transformation-rules* (make-hash-table :test 'eq)
+(defvar *transformations* (make-hash-table :test 'eq)
   "Transformation rules to compile meta-sexp grammar.")
 
 (defvar *atom-normalizer* #'char-upcase

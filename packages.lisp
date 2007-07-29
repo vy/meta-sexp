@@ -31,12 +31,16 @@
 (defpackage :meta-sexp
   (:documentation "LL(1) parser generator in META using s-expressions.")
   (:use :cl)
-  (:export :defatom
+  (:export :*transformations*
+           :define-transformation
+           :*atom-normalizer*
+           :transform-grammar
+           :defatom
            :defrule
            :defrenderer
-           :parser-context
-           :parser-context-error
            :create-parser-context
+           :meta
+           ;; Accumulators.
            :make-char-accum
            :char-accum-push
            :reset-char-accum
@@ -45,9 +49,6 @@
            :list-accum-push
            :reset-list-accum
            :empty-list-accum-p
-           :compile-grammar
-           :grammar-error
-           :meta
            ;; Builtin Type-Checkers
            :alnum?
            :alpha?
