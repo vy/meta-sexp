@@ -70,7 +70,7 @@
 
 (declaim (inline read-atom))
 (defun read-atom (ctx)
-  (when (< (parser-context-cursor ctx) (parser-context-size ctx))
+  (if (< (parser-context-cursor ctx) (parser-context-size ctx))
     (elt (parser-context-data ctx) (1- (incf (parser-context-cursor ctx))))))
 
 (declaim (inline checkpoint))
@@ -106,45 +106,44 @@
 
 ;;; Grammar Compiler
 
-(defmacro define-transformation (key (ctx forms) &body body)
-  "Shortcut to register new transformer to *TRANSFORMATIONS* table."
-  `(setf (gethash ,key *transformations*)
-        #'(lambda (,ctx ,forms)
-            (declare (ignorable ,ctx ,forms))
-            ,@body)))
-
 (define-condition parser-return ()
   ((value :initarg :value :accessor parser-return-value)))
 
-(defun transform-grammar (ctx form &optional (in-meta t))
-  (if in-meta
-      ;; In META scope.
-      (cond
-        ((and (consp form) (keywordp (car form)))
-         (let ((transformer (gethash (car form) *transformations*)))
-           (if (null transformer)
-               (transform-grammar ctx form nil)
-               (funcall transformer ctx (cdr form)))))
-        ((characterp form) `(match-atom ,ctx ,form))
-        ((stringp form)
-         (transform-grammar
-          ctx
-          `(:checkpoint
-            (and
-             ,@(mapcar
-                #'(lambda (form) `(match-atom ,ctx ,form))
-                (coerce form 'list))
-             ,form))))
-        (t (transform-grammar ctx form nil)))
-      ;; Out of META scope.
-      (cond
-        ((and (consp form) (eql 'meta (car form)))
-         (transform-grammar ctx `(:and ,@(cdr form))))
-        ((consp form)
-         (mapcar #'(lambda (form) (transform-grammar ctx form nil)) form))
-        (t form))))
+(defgeneric transform-grammar (ctx in-meta directive &optional args)
+  (:documentation "META grammar transformation methods."))
 
-(define-transformation :icase (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive character) &optional args)
+  "Transforms a character form."
+  (declare (ignore args))
+  `(match-atom ,ctx ,directive))
+
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive string) &optional args)
+  "Transforms a string form."
+  (declare (ignore args))
+  (transform-grammar
+   ctx t :checkpoint
+   `((and
+      ,@(mapcar
+         #'(lambda (form) `(match-atom ,ctx ,form))
+         (coerce directive 'list))
+      ,directive))))
+
+(defmethod transform-grammar (ctx in-meta directive &optional args)
+  "The most unspecific transformation method."
+  (declare (ignore args))
+  (cond
+    ((and in-meta (consp directive) (keywordp (car directive)))
+     (transform-grammar ctx t (car directive) (cdr directive)))
+    ((and (not in-meta) (consp directive) (eql 'meta (car directive)))
+     (transform-grammar ctx t :and (cdr directive)))
+    ((consp directive)
+     (mapcar #'(lambda (form) (transform-grammar ctx nil form)) directive))
+    (t directive)))
+
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :icase)) &optional args)
   "\(:ICASE FORM FORM ...)
 
 Make case-insensitive atom comparison in supplied FORMs."
@@ -152,7 +151,7 @@ Make case-insensitive atom comparison in supplied FORMs."
     `(progn
        (push t (parser-context-icases ,ctx))
        (let ((,ret
-              (handler-case ,(transform-grammar ctx `(:and ,@forms))
+              (handler-case ,(transform-grammar ctx t :and args)
                 (parser-return (data)
                   (pop (parser-context-icases ,ctx))
                   (signal 'parser-return
@@ -160,7 +159,8 @@ Make case-insensitive atom comparison in supplied FORMs."
          (pop (parser-context-icases ,ctx))
          ,ret))))
 
-(define-transformation :checkpoint (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :checkpoint)) &optional args)
   "\(:CHECKPOINT FORM FORM ...)
 
 Sequentially evaluates supplied forms and if any of them fails, moves cursor
@@ -169,7 +169,7 @@ back to its start position :CHECKPOINT began."
     `(progn
        (checkpoint ,ctx)
        (let ((,ret
-              (handler-case ,(transform-grammar ctx `(:and ,@forms))
+              (handler-case ,(transform-grammar ctx t :and args)
                 (parser-return (data)
                   (let ((value (parser-return-value data)))
                     (if value
@@ -181,143 +181,166 @@ back to its start position :CHECKPOINT began."
              (rollback ,ctx))
          ,ret))))
 
-(define-transformation :and (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :and)) &optional args)
   "\(:AND FORM FORM ...)
 
 Sequentially evaluates FORMs identical to AND."
-  `(and ,@(mapcar #'(lambda (form) (transform-grammar ctx form)) forms)))
+  `(and ,@(mapcar #'(lambda (form) (transform-grammar ctx t form)) args)))
 
-(define-transformation :or (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :or)) &optional args)
   "\(:OR FORM FORM ...)
 
 Sequentially evalutes FORMs identical to OR."
-  `(or ,@(mapcar #'(lambda (form) (transform-grammar ctx form)) forms)))
+  `(or ,@(mapcar #'(lambda (form) (transform-grammar ctx t form)) args)))
 
-(define-transformation :not (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :not)) &optional args)
   "\(:NOT FORM)
 
 Identical to \(NOT FORM). \(FORM is encapsulated within a :CHECKPOINT before
 getting evaluated.)"
   (transform-grammar
-   ctx `(:checkpoint (not ,(transform-grammar ctx (car forms))))))
+   ctx t :checkpoint
+   `((not ,(transform-grammar ctx t (car args))))))
 
-(define-transformation :return (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :return)) &optional args)
   "\(:RETURN VALUE VALUE ...)
 
 Returns from the rule with supplied VALUEs."
-  `(signal 'parser-return :value (list ,@forms)))
+  `(signal 'parser-return :value (list ,@args)))
 
-(define-transformation :render (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :render)) &optional args)
   "\(:RENDER RENDERER ARG ARG ...)
 
 Calls specified renderer \(which is defined with DEFRENDERER) with the supplied
 arguments."
-  `(,(car forms) ,@(nconc (list ctx) (cdr forms))))
+  `(,(car args) ,@(nconc (list ctx) (cdr args))))
 
-(define-transformation :? (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :?)) &optional args)
   "\(:? FORM FORM ...)
 
 Sequentially evaluates supplied FORMs within an AND scope and regardless of the
 return value of ANDed FORMs, block returns T. \(Similar to `?' in regular
 expressions.)"
-  `(prog1 t (and ,@(mapcar #'(lambda (form) (transform-grammar ctx form)) forms))))
+  `(prog1 t (and ,@(mapcar
+                    #'(lambda (form) (transform-grammar ctx t form))
+                    args))))
 
-(define-transformation :* (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :*)) &optional args)
   "\(:* FORM FORM ...)
 
 Sequentially evaluates supplied FORMs within an AND scope until it returns
 NIL. Regardless of the return value of ANDed FORMs, block returns T. \(Similar
 to `*' in regular expressions.)"
-  `(not (do () ((not ,(transform-grammar ctx `(:and ,@forms)))))))
+  `(not (do () ((not ,(transform-grammar ctx t :and args))))))
 
-(define-transformation :+ (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :+)) &optional args)
   "\(:+ FORM FORM ...)
 
 Sequentially evaluates supplied FORMs within an AND scope, and repeats this
 process till FORMs return NIL. Scope returns T if FORMs returned T once or more,
 otherwise returns NIL. \(Similar to `{1,}' in regular expressions.)"
-  (transform-grammar ctx `(:and ,@forms (:* ,@forms))))
+  (transform-grammar ctx t :and `(,@args (:* ,@args))))
 
-(define-transformation :type (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :type)) &optional args)
   "\(:TYPE TYPE-CHECKER)
 \(:TYPE \(OR TYPE-CHECKER TYPE-CHECKER ...))
 
 Checks type of the atom at the current position through supplied function(s)."
-  `(match-type ,ctx ,(car forms)))
+  `(match-type ,ctx ,(car args)))
 
-(define-transformation :rule (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :rule)) &optional args)
   "\(:RULE RULE ARG ARG ...)
 \(:RULE (OR RULE RULE ...) ARG ARG ...)
 
 Tests input in the current cursor position using specified type/form. If any,
 supplied arguments will get passed to rule."
-  (if (and (consp (car forms)) (eql 'or (caar forms)))
+  (if (and (consp (car args)) (eql 'or (caar args)))
       (transform-grammar
-       ctx `(:or ,@(mapcar #'(lambda (form) `(:rule ,form ,@(cdr forms)))
-                           (cdar forms))))
-      `(match-rule ,ctx ,(car forms) ,(cdr forms))))
+       ctx t :or (mapcar #'(lambda (form) `(:rule ,form ,@(cdr args)))
+                         (cdar args)))
+      `(match-rule ,ctx ,(car args) ,(cdr args))))
 
-(define-transformation :assign (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :assign)) &optional args)
   "\(:ASSIGN VAR FORM)
 \(:ASSIGN \(VAR1 VAR2 ...) FORM)
 
 Assigns returned value of FORM to VAR, and returns assigned value. \(Latter form
-  works similar to MULTIPLE-VALUE-SETQ.)"
-  (if (consp (car forms))
-      `(multiple-value-setq ,(car forms) ,(transform-grammar ctx (cadr forms)))
-      `(setq ,(car forms) ,(transform-grammar ctx (cadr forms)))))
+works similar to MULTIPLE-VALUE-SETQ.)"
+  (if (consp (car args))
+      `(multiple-value-setq ,(car args) ,(transform-grammar ctx t (cadr args)))
+      `(setq ,(car args) ,(transform-grammar ctx t (cadr args)))))
 
-(define-transformation :list-push (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :list-push)) &optional args)
   "\(:LIST-PUSH ITEM-VAR LIST-ACCUM)
 
 Pushes ITEM-VAR into the specified LIST-ACCUM. (See MAKE-LIST-ACCUM and
 EMPTY-LIST-ACCUM-P.)"
-  `(list-accum-push ,(car forms) ,(cadr forms)))
+  `(list-accum-push ,(car args) ,(cadr args)))
 
-(define-transformation :list-reset (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :list-reset)) &optional args)
   "\(:LIST-RESET LIST-ACCUM)
 
 Resets supplied LIST-ACCUM."
-  `(reset-list-accum ,(car forms)))
+  `(reset-list-accum ,(car args)))
 
-(define-transformation :char-push (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :char-push)) &optional args)
   "\(:CHAR-PUSH CHAR-VAR CHAR-ACCUM)
 \(:CHAR-PUSH CHAR-ACCUM)
 
 Pushes supplied CHAR-VAR into specified CHAR-ACCUM. If called with
 a single argument, current character gets read and pushed into supplied
 accumulator. (See MAKE-CHAR-ACCUM and EMPTY-CHAR-ACCUM-P.)"
-  (if (cdr forms)
-      `(char-accum-push ,(car forms) ,(cadr forms))
-      `(char-accum-push (read-atom ,ctx) ,(car forms))))
+  (if (cdr args)
+      `(char-accum-push ,(car args) ,(cadr args))
+      `(char-accum-push (read-atom ,ctx) ,(car args))))
 
-(define-transformation :char-reset (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :char-reset)) &optional args)
   "\(:CHAR-RESET CHAR-ACCUM)
 
 Resets supplied CHAR-ACCUM."
-  `(reset-char-accum ,(car forms)))
+  `(reset-char-accum ,(car args)))
 
-(define-transformation :eof (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :eof)) &optional args)
   "\(:EOF)
 
 Returns T when reached to the end of supplied input data."
+  (declare (ignore args))
   `(= (parser-context-cursor ,ctx) (parser-context-size ,ctx)))
 
-(define-transformation :read-atom (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :read-atom)) &optional args)
   "\(:READ-ATOM)
 
 Reads current atom at the cursor position and returns read atom."
+  (declare (ignore args))
   `(read-atom ,ctx))
 
-(define-transformation :debug (ctx forms)
+(defmethod transform-grammar
+    (ctx (in-meta (eql t)) (directive (eql :debug)) &optional args)
   "\(:DEBUG)
 \(:DEBUG VAR)
 
 Print current character and its position in the input data. If VAR is specified,
 print the value of the VAR."
   `(prog1 t
-     ,(if (car forms)
-          `(format t "DEBUG: ~s: ~a~%" ',(car forms) ,(car forms))
+     ,(if (car args)
+          `(format t "DEBUG: ~s: ~a~%" ',(car args) ,(car args))
           `(format t "DEBUG: cursor: [~s] `~s'~%"
                    (parser-context-cursor ,ctx)
                    (elt (parser-context-data ,ctx)
@@ -338,8 +361,8 @@ print the value of the VAR."
        (handler-case
            ,(if attachment
                 `(let ((,attachment (parser-context-attachment ,ctx)))
-                   ,(transform-grammar ctx `(:checkpoint ,@body)))
-                (transform-grammar ctx `(:checkpoint ,@body)))
+                   ,(transform-grammar ctx t :checkpoint body))
+                (transform-grammar ctx t :checkpoint body))
          (parser-return (data)
            (return-from ,name (apply #'values (parser-return-value data))))))))
 

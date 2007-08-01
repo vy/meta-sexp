@@ -33,14 +33,13 @@
 
 (in-package :meta-sexp-asd)
 
-(defconstant +meta-sexp-version+ "0.1.3")
+(defconstant +meta-sexp-version+ "0.1.4")
 (export '+meta-sexp-version+)
 
 (asdf:defsystem :meta-sexp
   :serial t
   :version +meta-sexp-version+
   :components ((:file "packages")
-               (:file "specials")
                (:file "util")
                (:file "meta-sexp")
                (:file "atoms")))

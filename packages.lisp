@@ -31,10 +31,7 @@
 (defpackage :meta-sexp
   (:documentation "LL(1) parser generator in META using s-expressions.")
   (:use :cl)
-  (:export :*transformations*
-           :define-transformation
-           :*atom-normalizer*
-           :transform-grammar
+  (:export :transform-grammar
            :defatom
            :defrule
            :defrenderer

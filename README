@@ -8,10 +8,10 @@ commonly used streams, for efficiently stepping backward and forward
 through the input. It is tested on SBCL but should be portable to
 other implementations as well.
 
-meta-sexp is implemented using modular transformation processors.
+meta-sexp is implemented using sevaral transformation methods.
 Therefore, besides builtin grammar transformators coming with
-meta-sexp, you can easily add your own transformation keywords to
-meta-sexp too. (See DEFINE-TRANSFORMATION macro in meta-sexp.lisp.)
+meta-sexp by default, you are allowed to add your own transformation
+methods too.
 
 Inspired by src/parser.lisp of core-stream project at
 http://core.gen.tr/
@@ -216,3 +216,49 @@ iii. Treat as a custom form. (Will get evaluated as is)
 When you're in the third situation, to be able to get your META
 s-expressions compiled again, use META keyword. (See the second
 example in the Quick Introduction.)
+
+
+ ,---------------------------------.
+ | INTRODUCING NEW TRANSFORMATIONS |
+ `---------------------------------'
+
+Every transformation process issued by meta-sexp is controlled by
+TRANSFORM-GRAMMAR methods.
+
+  (defgeneric transform-grammar (ctx in-meta directive &optional args)
+    (:documentation "META grammar transformation methods."))
+
+To introduce a new transformation directive, just create a new
+TRANSFORM-GRAMMAR method with related lambda list specializers. For
+instance, consider how :AND and :NOT directive transformations are
+implemented:
+
+  (defmethod transform-grammar
+      (ctx (in-meta (eql t)) (directive (eql :and)) &optional args)
+    `(and ,@(mapcar #'(lambda (form) (transform-grammar ctx t form))
+                    args)))
+  
+  (defmethod transform-grammar
+      (ctx (in-meta (eql t)) (directive (eql :not)) &optional args)
+    (transform-grammar
+     ctx t :checkpoint
+     `((not ,(transform-grammar ctx t (car args))))))
+
+Also pay attention how meta-sexp handles unrecognized transformation
+directives:
+
+  (defmethod transform-grammar (ctx in-meta directive &optional args)
+    "The most unspecific transformation method."
+    (declare (ignore args))
+    (cond
+      ((and in-meta (consp directive) (keywordp (car directive)))
+       (transform-grammar ctx t (car directive) (cdr directive)))
+      ((and (not in-meta) (consp directive) (eql 'meta (car directive)))
+       (transform-grammar ctx t :and (cdr directive)))
+      ((consp directive)
+       (mapcar #'(lambda (form) (transform-grammar ctx nil form))
+                         directive))
+      (t directive)))
+     
+With similar patterns, you can introduce new transformation directives
+to meta-sexp.
