@@ -349,10 +349,10 @@ print the value of the VAR."
 
 ;;; Atom, Rule & Renderer Definition Macros
 
-(defmacro defatom (name &body body)
+(defmacro defatom (name (c) &body body)
   `(progn
      (declaim (inline ,name))
-     (defun ,name (c) (when c ,@body))
+     (defun ,name (,c) (when ,c ,@body))
      (deftype ,name () `(satisfies ,',name))))
 
 (defmacro defrule (name (&rest args) (&optional attachment) &body body)

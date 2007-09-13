@@ -28,43 +28,43 @@
 
 (in-package :meta-sexp)
 
-(defatom ascii?
+(defatom ascii? (c)
   (typep c 'standard-char))
 
-(defatom extended?
+(defatom extended? (c)
   (typep c 'extended-char))
 
-(defatom alpha?
+(defatom alpha? (c)
   (alpha-char-p c))
 
-(defatom alnum?
+(defatom alnum? (c)
   (alphanumericp c))
 
-(defatom graphic?
+(defatom graphic? (c)
   (graphic-char-p c))
 
-(defatom upper?
+(defatom upper? (c)
   (upper-case-p c))
 
-(defatom lower?
+(defatom lower? (c)
   (lower-case-p c))
 
-(defatom digit?
+(defatom digit? (c)
   (digit-char-p c))
 
-(defatom bit?
+(defatom bit? (c)
   (or (char= c #\0)
       (char= c #\1)))
 
-(defatom space?
+(defatom space? (c)
   (char= c #\space))
 
-(defatom newline?
+(defatom newline? (c)
   (char= c #\newline))
 
-(defatom tab?
+(defatom tab? (c)
   (char= c #\tab))
 
-(defatom white-space?
+(defatom white-space? (c)
   (or (space? c)
       (tab? c)))
