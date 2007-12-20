@@ -64,12 +64,12 @@ Here is another example demonstrating the usage of META symbol.
     (:return t))
 
   (in-wonderland?
-   (create-parser-context :data "META-SEXP in Wonderland!"))
+   (create-parser-context "META-SEXP in Wonderland!"))
   META-SEXP in Wonderland!
   ==> T
 
   (in-wonderland?
-   (create-parser-context :data "META-SEXP in Fooland!"))
+   (create-parser-context "META-SEXP in Fooland!"))
   META-SEXP in Wonderland!
   ==> NIL
 
