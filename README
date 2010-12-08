@@ -111,6 +111,34 @@ approach yields to another problem: thread safety. Anyway, that was
 the best that I can come up with; if you have any other ideas, I'd be
 happy to hear them.
 
+Here is an example introducing a new transformation to the grammar:
+
+  (defun callback (string cursor &rest args)
+    (format t "Callback at char ~S at position ~D. (Args: ~S)~%"
+            (elt string cursor) cursor args))
+
+  (defmethod meta-sexp:transform-grammar
+      (ret ctx (in-meta (eql t)) (directive (eql :callback)) &optional args)
+    "\(:CALLBACK ARG ...)
+
+  Calls CALLBACK function, where the first two arguments passed to the function
+  are the input string and cursor position, and the rest is ARG."
+    `(apply #'callback
+            (meta-sexp::parser-context-data ,ctx)
+            (meta-sexp::parser-context-cursor ,ctx)
+            ,@args))
+
+  (defrule integer-debug? () ()
+    (:or (:rule integer?)
+         (:callback (list :rule :integer-debug?))))
+
+  ; TEST> (integer-debug? (create-parser-context "xy+123"))
+  ; Callback at char #\x at position 0. (Args: (:RULE :INTEGER-DEBUG?))
+  ; NIL
+
+  ; TEST> (integer-debug? (create-parser-context "+123"))
+  ; 123
+
 
  ,-------------------------.
  | AVAILABLE TYPE CHECKERS |
