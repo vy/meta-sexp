@@ -123,61 +123,77 @@ These functions (and types) are routines introduced using `DEFATOM` and operates
 
 # Built-In Transformations
 
-`(:ICASE FORM FORM ...)`
+    (:ICASE FORM FORM ...)
+
 > Make case-insensitive atom comparison in supplied `FORM`s.
 
-`(:CHECKPOINT FORM)`
+    (:CHECKPOINT FORM)
+
 > Sequentially evaluates supplied forms and if any of them fails, moves cursor back to its start position `:CHECKPOINT` began.
 
-`(:AND FORM FORM ...)<br/>
-(:OR FORM FORM ...)<br/>
-(:NOT FORM)`
+    (:AND FORM FORM ...)
+    (:OR FORM FORM ...)
+    (:NOT FORM)
+
 > Identical to `(NOT FORM)`. (`FORM` is encapsulated within a `:CHECKPOINT` before getting evaluated.)
 
-`(:RETURN VALUE VALUE ...)`
+    (:RETURN VALUE VALUE ...)
+
 > Returns from the rule with supplied `VALUE`s.
 
-`(:RENDER RENDERER ARG ARG ...)`
+    (:RENDER RENDERER ARG ARG ...)
+
 > Calls specified `RENDERER` (that is defined with `DEFRENDERER`) with supplied arguments.
 
-`(:? FORM FORM ...)`
+    (:? FORM FORM ...)
+
 > Sequentially evaluates supplied `FORM`s within an `AND` scope and regardless of the return value of `AND`ed `FORM`s, block returns `T`. (Similar to `?` in regular expressions.)
 
-`(:* FORM FORM ...)`
+    (:* FORM FORM ...)
+
 > Sequentially evaluates supplied `FORM`s within an `AND` scope until it returns `NIL`. Regardless of the return value of `AND`ed `FORM`s, block returns `T`. (Similar to `*` in regular expressions.)
 
-`(:+ FORM FORM ...)`
+    (:+ FORM FORM ...)
+
 > Sequentially evaluates supplied `FORM`s within an `AND` scope, and repeats this process till `FORM`s return `NIL`. Scope returns `T` if `FORM`s returned `T` once or more, otherwise returns `NIL`. (Similar to `{1,}` in regular expressions.)
 
-`(:TYPE TYPE-CHECKER)<br/>
-(:TYPE (OR TYPE-CHECKER TYPE-CHECKER ...))`
+    (:TYPE TYPE-CHECKER)
+    (:TYPE (OR TYPE-CHECKER TYPE-CHECKER ...))
+
 > Checks type of the atom at the current position through supplied function(s).
 
-`(:RULE RULE ARG ARG ...)<br/>
-(:RULE (OR RULE RULE ...) ARG ARG ...)`
+    (:RULE RULE ARG ARG ...)
+    (:RULE (OR RULE RULE ...) ARG ARG ...)
+
 > Tests input in the current cursor position using specified type/form. If any, supplied arguments will get passed to rule.
 
-`(:ASSIGN VAR FORM)<br/>
-(:ASSIGN (VAR1 VAR2 ...) FORM)`
+    (:ASSIGN VAR FORM)
+    (:ASSIGN (VAR1 VAR2 ...) FORM)
+
 > Assigns returned value of `FORM` to `VAR`, and returns assigned value. (Latter form works similar to `MULTIPLE-VALUE-SETQ`.)
 
-`(:LIST-PUSH ITEM-VAR LIST-ACCUM)<br/>
-(:CHAR-PUSH CHAR-VAR CHAR-ACCUM)<br/>
-(:CHAR-PUSH CHAR-ACCUM)`
+    (:LIST-PUSH ITEM-VAR LIST-ACCUM)
+    (:CHAR-PUSH CHAR-VAR CHAR-ACCUM)
+    (:CHAR-PUSH CHAR-ACCUM)
+
 > Pushes supplied `ITEM-VAR`/`CHAR-VAR` into specified `LIST-ACCUM`/`CHAR-ACCUM`. If `:CHAR-PUSH` is called with only one argument, current character gets read and pushed into supplied accumulator. (You can use `MAKE-LIST-ACCUM` and `MAKE-CHAR-ACCUM` functions to initialize new accumulators. Moreover, you'll probably need `EMPTY-LIST-ACCUM-P` and `EMPTY-CHAR-ACCUM-P` predicates too.)
 
-`(:LIST-RESET LIST-ACCUM)<br/>
-(:CHAR-RESET CHAR-ACCUM)`
+    (:LIST-RESET LIST-ACCUM)
+    (:CHAR-RESET CHAR-ACCUM)
+
 > Resets supplied accumulators.
 
-`(:EOF)`
+    (:EOF)
+
 > Returns true when reached to the end of supplied input data.
 
-`(:READ-ATOM)`
+    (:READ-ATOM)
+
 > Reads current atom at the cursor position and returns read atom.
 
-`(:DEBUG)<br/>
-(:DEBUG VAR)`
+    (:DEBUG)
+    (:DEBUG VAR)
+
 > Prints current character and its position in the input data. If `VAR` is specified, prints the value of the `VAR`.
 
 If a form doesn't start with any of the above keywords, there're three possiblities remaining:
