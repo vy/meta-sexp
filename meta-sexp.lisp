@@ -48,7 +48,7 @@
                        :attachment attachment))
 
 (defmethod create-parser-context
-    ((input string-stream) &key buffer-size start end attachment)
+    ((input stream) &key buffer-size start end attachment)
   (loop with out = (make-string-output-stream)
         with buffer-size = (or buffer-size 8192)
         with buf = (make-string buffer-size)
